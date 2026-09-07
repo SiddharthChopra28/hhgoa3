@@ -30,8 +30,8 @@ The contract stores one record per image hash. Each record holds the keccak256 h
         v                  v                  v                     v
 +---------------+  +---------------+  +----------------+  +--------------------+
 | services/face |  | Vercel Blob   |  | SerpApi Lens   |  | FaceMatchRegistry  |
-| FastAPI       |  | temp public   |  | (TinEye        |  | Solidity, Arbitrum |
-| InsightFace   |  | URL, deleted  |  |  fallback)     |  | One via viem       |
+| FastAPI       |  | temp public   |  | (TinEye        |  | Solidity, EVM      |
+| InsightFace   |  | URL, deleted  |  |  fallback)     |  | Sepolia via viem   |
 | buffalo_l     |  | after run     |  |                |  |                    |
 +---------------+  +---------------+  +----------------+  +--------------------+
 ```
@@ -73,7 +73,7 @@ docker-compose.yml
 - Node 22 and pnpm 10
 - Python 3.12 and `uv` (or Docker for the face service)
 - Foundry (`forge`, `cast`, `anvil`)
-- Accounts: SerpApi, TinEye (optional), Vercel Blob, an Arbitrum RPC endpoint, a funded server wallet
+- Accounts: SerpApi, TinEye (optional), Vercel Blob, an RPC endpoint for the target chain, a funded server wallet
 
 ## Configuration
 
