@@ -38,20 +38,25 @@ export function PhotoPanel({
   const [rendered, setRendered] = React.useState({ width: 0, height: 0 });
   const [natural, setNatural] = React.useState({ width: 0, height: 0 });
 
-  React.useEffect(() => {
-    const el = imgRef.current;
-    if (!el || !url || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      setRendered({ width: el.clientWidth, height: el.clientHeight });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [url]);
-
-  function handleLoad(event: React.SyntheticEvent<HTMLImageElement>) {
-    const el = event.currentTarget;
+  const measure = React.useCallback((el: HTMLImageElement) => {
+    if (el.naturalWidth === 0) return;
     setRendered({ width: el.clientWidth, height: el.clientHeight });
     setNatural({ width: el.naturalWidth, height: el.naturalHeight });
+  }, []);
+
+  React.useEffect(() => {
+    const el = imgRef.current;
+    if (!el || !url) return;
+    // A cached blob can be complete before onLoad is attached, so measure now as well.
+    if (el.complete) measure(el);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measure(el));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [url, measure]);
+
+  function handleLoad(event: React.SyntheticEvent<HTMLImageElement>) {
+    measure(event.currentTarget);
   }
 
   // Fall back to the file's natural ratio if the resized dims never arrived.
@@ -60,7 +65,9 @@ export function PhotoPanel({
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-xl border border-hairline bg-ink-950">
+      {/* The wrapper hugs the image so the overlay's inset-0 box equals the rendered image box. */}
+      <div className="flex justify-center rounded-xl border border-hairline bg-ink-950">
+      <div className="relative overflow-hidden rounded-xl">
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -68,7 +75,7 @@ export function PhotoPanel({
           src={url}
           alt="The photo you uploaded. Once detection completes the found face is outlined."
           onLoad={handleLoad}
-          className="block h-auto w-full select-none"
+          className="block h-auto max-h-[60vh] w-auto max-w-full select-none"
         />
         ) : null}
         {box && srcW > 0 && srcH > 0 && rendered.width > 0 ? (
@@ -80,6 +87,7 @@ export function PhotoPanel({
             height={rendered.height}
           />
         ) : null}
+      </div>
       </div>
 
       <div className="flex items-center gap-2">
