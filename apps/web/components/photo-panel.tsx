@@ -25,8 +25,14 @@ export function PhotoPanel({
   onRun: () => void;
   onReset: () => void;
 }) {
-  const url = React.useMemo(() => URL.createObjectURL(file), [file]);
-  React.useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  // Create and revoke inside one effect so StrictMode's double-invoke cannot revoke a live URL.
+  const [url, setUrl] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    const next = URL.createObjectURL(file);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- object URL must be created and revoked in the same effect
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
 
   const imgRef = React.useRef<HTMLImageElement>(null);
   const [rendered, setRendered] = React.useState({ width: 0, height: 0 });
@@ -34,7 +40,7 @@ export function PhotoPanel({
 
   React.useEffect(() => {
     const el = imgRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
+    if (!el || !url || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
       setRendered({ width: el.clientWidth, height: el.clientHeight });
     });
@@ -55,14 +61,16 @@ export function PhotoPanel({
   return (
     <div className="space-y-4">
       <div className="relative overflow-hidden rounded-xl border border-hairline bg-ink-950">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
           ref={imgRef}
           src={url}
           alt="The photo you uploaded. Once detection completes the found face is outlined."
           onLoad={handleLoad}
           className="block h-auto w-full select-none"
         />
+        ) : null}
         {box && srcW > 0 && srcH > 0 && rendered.width > 0 ? (
           <FaceOverlay
             box={box}
