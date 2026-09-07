@@ -12,7 +12,7 @@ Scope: this is image-level provenance ("where has this photo been posted?"), not
 | Contract | `FaceMatchRegistry` at `<ARBITRUM_ONE_CONTRACT_ADDRESS>` |
 | Arbiscan | `<ARBITRUM_ONE_ARBISCAN_CONTRACT_URL>` |
 | Example transaction | `<ARBITRUM_ONE_EXAMPLE_TX_URL>` |
-| Test deployment | Ethereum Sepolia (chain id 11155111) at [`0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87`](https://sepolia.etherscan.io/address/0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87) |
+| Test deployment | Ethereum Sepolia (chain id 11155111) at [`0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87`](https://sepolia.etherscan.io/address/0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87), source [verified on Etherscan](https://sepolia.etherscan.io/address/0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87#code) |
 | Test deployment tx | [`0x238aff84…727d04`](https://sepolia.etherscan.io/tx/0x238aff84e54344432a4ff34c9dc7fd0bd9cd78f33fad97f65a5ca53e2c727d04) |
 | Test sealed record | [`0x27a6113d…bae48a`](https://sepolia.etherscan.io/tx/0x27a6113d90c864b48760718a1d753a555bab53f1976113b45c35ff8e68bae48a) (`MatchRecorded` for `demo/virat.jpg`) |
 
