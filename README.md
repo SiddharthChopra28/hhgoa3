@@ -38,7 +38,7 @@ Pipeline stages, in order:
 1. `upload`: validate (image, at most 5 MB), auto-rotate and resize to a 1024 px longest side, compute `imageHash = keccak256(resized bytes)`, upload to a temporary public URL.
 2. `detect`: send the resized image to the face service, take the largest face, keep its 512-d ArcFace embedding in server memory, compute `faceHash` from a deterministic serialisation of the rounded embedding.
 3. `search`: reverse-image search the temporary URL with Google Lens (SerpApi), filter results to social platforms, deduplicate, fall back to TinEye on zero results or quota errors.
-4. `verify`: for each candidate, the face service downloads the candidate thumbnail, detects faces and returns the maximum cosine similarity to the stored embedding. Candidates at or above the threshold (default 0.5) are kept and sorted.
+4. `verify`: for each candidate, the face service downloads the full-size image reported by the search provider (falling back to the thumbnail), detects faces and returns the maximum cosine similarity to the stored embedding. Candidates at or above the threshold (default 0.5) are kept and sorted.
 5. `record`: write `(imageHash, faceHash, bestPostUrl)` to the registry with a capped gas price, wait for the receipt and return the transaction and block.
 
 The temporary upload is deleted in a `finally` block on every path. The embedding is dropped from memory when the run ends or after ten minutes.

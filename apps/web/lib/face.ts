@@ -86,6 +86,7 @@ export async function compare(embedding: number[], imageUrl: string): Promise<Fa
   return {
     similarity: typeof body.similarity === "number" ? body.similarity : 0,
     faces: typeof body.faces === "number" ? body.faces : 0,
+    error: typeof body.error === "string" ? body.error : undefined,
   };
 }
 

@@ -96,6 +96,7 @@ function lensMatchToCandidate(raw: unknown): Candidate | null {
   return {
     url: link,
     platform,
+    image: str(m.image),
     thumbnail: str(m.thumbnail),
     title: str(m.title) ?? str(m.source),
     provider: "google_lens",
@@ -153,7 +154,8 @@ async function tineye(imageUrl: string): Promise<Candidate[]> {
       out.push({
         url: page,
         platform,
-        thumbnail: str(bl.url) ?? image,
+        image: str(bl.url) ?? image,
+        thumbnail: image,
         title: str(match.domain),
         provider: "tineye",
       });

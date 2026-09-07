@@ -2,7 +2,8 @@ import { deleteHosted, hostImage } from "./blob";
 import { recordMatch } from "./chain";
 import { env } from "./env";
 import { errorMessage } from "./errors";
-import { compare, detect, toFaceBox } from "./face";
+import { detect, toFaceBox } from "./face";
+import { scoreCandidate } from "./verify";
 import { faceHash } from "./hash";
 import { prepareImage } from "./image";
 import { createJob, deleteJob, newJobId } from "./jobs";
@@ -49,17 +50,7 @@ async function verifyCandidates(
   embedding: number[],
   candidates: Candidate[],
 ): Promise<VerifiedCandidate[]> {
-  const scored = await pool(candidates, VERIFY_CONCURRENCY, async (candidate) => {
-    // The thumbnail is the image; the post URL is an HTML page the face service cannot read.
-    if (!candidate.thumbnail) return null;
-    try {
-      const { similarity } = await compare(embedding, candidate.thumbnail);
-      return { ...candidate, similarity } satisfies VerifiedCandidate;
-    } catch (e) {
-      console.warn(`[verify] ${candidate.url}: ${errorMessage(e)}`);
-      return null;
-    }
-  });
+  const scored = await pool(candidates, VERIFY_CONCURRENCY, (candidate) => scoreCandidate(embedding, candidate));
   return scored
     .filter((c): c is VerifiedCandidate => c !== null)
     .sort((a, b) => b.similarity - a.similarity);

@@ -25,6 +25,7 @@ export interface FaceBox {
 export interface Candidate {
   url: string;
   platform: Platform;
+  image?: string; // full-size image URL when the provider exposes one
   thumbnail?: string;
   title?: string;
   provider: SearchProvider;
@@ -144,4 +145,5 @@ export interface FaceServiceDetectResponse {
 export interface FaceServiceCompareResponse {
   similarity: number;
   faces: number;
+  error?: string; // set when the candidate could not be fetched or decoded
 }

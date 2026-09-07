@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
-import { AppError, errorMessage } from "@/lib/errors";
-import { compare } from "@/lib/face";
+import { AppError } from "@/lib/errors";
+import { scoreCandidate } from "@/lib/verify";
 import { jsonError, readJson } from "@/lib/http";
 import { getJob } from "@/lib/jobs";
 import type { VerifiedCandidate } from "@/lib/types";
@@ -29,6 +29,7 @@ const bodySchema = z.object({
       z.object({
         url: z.string().url(),
         platform,
+        image: z.string().url().optional(),
         thumbnail: z.string().url().optional(),
         title: z.string().optional(),
         provider: z.enum(["google_lens", "tineye"]),
@@ -47,13 +48,8 @@ export async function POST(req: Request) {
     const threshold = env.FACE_SIMILARITY_THRESHOLD;
     const scored: VerifiedCandidate[] = [];
     for (const candidate of parsed.data.candidates) {
-      if (!candidate.thumbnail) continue;
-      try {
-        const { similarity } = await compare(job.embedding, candidate.thumbnail);
-        scored.push({ ...candidate, similarity });
-      } catch (e) {
-        console.warn(`[verify] ${candidate.url}: ${errorMessage(e)}`);
-      }
+      const result = await scoreCandidate(job.embedding, candidate);
+      if (result) scored.push(result);
     }
     scored.sort((a, b) => b.similarity - a.similarity);
     const matches = scored.filter((c) => c.similarity >= threshold);
