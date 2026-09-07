@@ -14,6 +14,7 @@ export function truncateHash(value: string, head = 10, tail = 8) {
 export function chainName(chainId: number) {
   if (chainId === 42161) return "Arbitrum One";
   if (chainId === 421614) return "Arbitrum Sepolia";
+  if (chainId === 11155111) return "Ethereum Sepolia";
   return `Chain ${chainId}`;
 }
 

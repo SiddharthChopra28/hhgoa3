@@ -10,22 +10,36 @@ import {
   type PublicClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrum, arbitrumSepolia } from "viem/chains";
+import { arbitrum, arbitrumSepolia, sepolia } from "viem/chains";
 import { CONTRACT_ADDRESSES, FACE_MATCH_REGISTRY_ABI } from "./contract";
 import { env, requireEnv } from "./env";
 import { AppError, GasTooHighError } from "./errors";
+import { log } from "./log";
 import type { ChainReceipt, OnChainRecord } from "./types";
 
+interface ChainConfig {
+  chain: Chain;
+  rpc: () => string;
+  explorer: string;
+}
+
+// Arbitrum One is the production target; the two Sepolias are for dry runs.
+const CHAINS: Record<typeof env.CHAIN, ChainConfig> = {
+  "arbitrum-one": { chain: arbitrum, rpc: () => env.ARBITRUM_ONE_RPC_URL, explorer: "https://arbiscan.io" },
+  "arbitrum-sepolia": { chain: arbitrumSepolia, rpc: () => env.ARBITRUM_SEPOLIA_RPC_URL, explorer: "https://sepolia.arbiscan.io" },
+  "ethereum-sepolia": { chain: sepolia, rpc: () => env.ETHEREUM_SEPOLIA_RPC_URL, explorer: "https://sepolia.etherscan.io" },
+};
+
 export function getChain(): Chain {
-  return env.CHAIN === "arbitrum-one" ? arbitrum : arbitrumSepolia;
+  return CHAINS[env.CHAIN].chain;
 }
 
 function rpcUrl(): string {
-  return env.CHAIN === "arbitrum-one" ? env.ARBITRUM_ONE_RPC_URL : env.ARBITRUM_SEPOLIA_RPC_URL;
+  return CHAINS[env.CHAIN].rpc();
 }
 
 export function explorerBase(): string {
-  return env.CHAIN === "arbitrum-one" ? "https://arbiscan.io" : "https://sepolia.arbiscan.io";
+  return CHAINS[env.CHAIN].explorer;
 }
 
 export function getContractAddress(): Hex {
@@ -84,7 +98,7 @@ export async function recordMatch(input: RecordMatchInput): Promise<ChainReceipt
   });
 
   const gasCostWei = receipt.gasUsed * receipt.effectiveGasPrice;
-  console.info(`[chain] tx ${txHash} used ${receipt.gasUsed} gas, cost ${formatEther(gasCostWei)} ETH`);
+  log(`[chain] tx ${txHash} used ${receipt.gasUsed} gas, cost ${formatEther(gasCostWei)} ETH`);
 
   const base = explorerBase();
   return {

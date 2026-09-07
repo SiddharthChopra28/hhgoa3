@@ -6,6 +6,7 @@ import { cn } from "@/components/ui/utils";
 const CHAIN_LABEL: Record<string, string> = {
   "arbitrum-one": "Arbitrum One",
   "arbitrum-sepolia": "Arbitrum Sepolia",
+  "ethereum-sepolia": "Ethereum Sepolia",
 };
 
 interface Health {

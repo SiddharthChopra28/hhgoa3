@@ -60,11 +60,21 @@ function dedupeAndCap(candidates: Candidate[], cap: number): Candidate[] {
   return out;
 }
 
-async function getJson(url: string, init: RequestInit = {}): Promise<{ status: number; body: unknown }> {
+async function getJson(url: string, init: RequestInit = {}, attempt = 0): Promise<{ status: number; body: unknown }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), env.SEARCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
+    let res: Response;
+    try {
+      res = await fetch(url, { ...init, signal: controller.signal });
+    } catch (e) {
+      // One retry for transport-level failures (DNS, reset); timeouts are not retried.
+      if (attempt === 0 && !controller.signal.aborted && !(init.body instanceof FormData)) {
+        clearTimeout(timer);
+        return getJson(url, init, 1);
+      }
+      throw e;
+    }
     const text = await res.text();
     let body: unknown = null;
     try {

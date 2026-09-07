@@ -12,7 +12,9 @@ remappings = ["forge-std/=lib/forge-std/src/"]
 [rpc_endpoints]
 arbitrum_sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
 arbitrum_one = "${ARBITRUM_ONE_RPC_URL}"
+ethereum_sepolia = "${ETHEREUM_SEPOLIA_RPC_URL}"
 
 [etherscan]
 arbitrum_sepolia = { key = "${ARBISCAN_API_KEY}", chain = 421614 }
 arbitrum_one = { key = "${ARBISCAN_API_KEY}", chain = 42161 }
+ethereum_sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 11155111 }

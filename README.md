@@ -12,7 +12,9 @@ Scope: this is image-level provenance ("where has this photo been posted?"), not
 | Contract | `FaceMatchRegistry` at `<ARBITRUM_ONE_CONTRACT_ADDRESS>` |
 | Arbiscan | `<ARBITRUM_ONE_ARBISCAN_CONTRACT_URL>` |
 | Example transaction | `<ARBITRUM_ONE_EXAMPLE_TX_URL>` |
-| Test deployment | Arbitrum Sepolia (chain id 421614) at `<ARBITRUM_SEPOLIA_CONTRACT_ADDRESS>` |
+| Test deployment | Ethereum Sepolia (chain id 11155111) at [`0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87`](https://sepolia.etherscan.io/address/0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87) |
+| Test deployment tx | [`0x238aff84…727d04`](https://sepolia.etherscan.io/tx/0x238aff84e54344432a4ff34c9dc7fd0bd9cd78f33fad97f65a5ca53e2c727d04) |
+| Test sealed record | [`0x27a6113d…bae48a`](https://sepolia.etherscan.io/tx/0x27a6113d90c864b48760718a1d753a555bab53f1976113b45c35ff8e68bae48a) (`MatchRecorded` for `demo/virat.jpg`) |
 
 The contract stores one record per image hash. Each record holds the keccak256 hash of the normalised image, the keccak256 hash of the face embedding, the URL of the matching post, the block timestamp and the submitting address, and emits a `MatchRecorded` event with the same data.
 
@@ -83,8 +85,8 @@ Copy `.env.example` to `.env` at the repository root and fill in the values. Bot
 | `SERPAPI_API_KEY` | SerpApi key for Google Lens |
 | `TINEYE_API_KEY` | Optional TinEye key used as fallback |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob token for the temporary upload |
-| `CHAIN` | `arbitrum-one` or `arbitrum-sepolia` |
-| `ARBITRUM_ONE_RPC_URL`, `ARBITRUM_SEPOLIA_RPC_URL` | RPC endpoints |
+| `CHAIN` | `arbitrum-one` (production), `arbitrum-sepolia` or `ethereum-sepolia` (dry runs) |
+| `ARBITRUM_ONE_RPC_URL`, `ARBITRUM_SEPOLIA_RPC_URL`, `ETHEREUM_SEPOLIA_RPC_URL` | RPC endpoints |
 | `PRIVATE_KEY` | Server wallet used to submit records |
 | `FACE_MATCH_REGISTRY_ADDRESS` | Optional override of the address in `apps/web/lib/contract.ts` |
 | `MAX_FEE_PER_GAS_GWEI` | Gas price cap for the write, default `1` |
@@ -163,6 +165,8 @@ forge script script/Deploy.s.sol --rpc-url arbitrum_sepolia --broadcast --verify
 ```
 
 Then put the deployed address into `apps/web/lib/contract.ts` (or set `FACE_MATCH_REGISTRY_ADDRESS`).
+
+For an Ethereum Sepolia dry run use `--rpc-url ethereum_sepolia` and set `CHAIN=ethereum-sepolia`. L1 Sepolia gas is around 1 gwei, so raise `MAX_FEE_PER_GAS_GWEI` to about 5 there; the default of 1 is sized for Arbitrum.
 
 ## API
 

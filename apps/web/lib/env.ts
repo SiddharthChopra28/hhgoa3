@@ -28,6 +28,7 @@ const SCHEMA_KEYS = [
   "CHAIN",
   "ARBITRUM_SEPOLIA_RPC_URL",
   "ARBITRUM_ONE_RPC_URL",
+  "ETHEREUM_SEPOLIA_RPC_URL",
   "PRIVATE_KEY",
   "FACE_MATCH_REGISTRY_ADDRESS",
   "MAX_FEE_PER_GAS_GWEI",
@@ -58,12 +59,14 @@ const schema = z.object({
   TINEYE_API_KEY: z.string().min(1).optional(),
   SEARCH_TIMEOUT_MS: int(30_000),
   BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
-  CHAIN: z.enum(["arbitrum-sepolia", "arbitrum-one"]).default("arbitrum-sepolia"),
+  CHAIN: z.enum(["arbitrum-sepolia", "arbitrum-one", "ethereum-sepolia"]).default("arbitrum-sepolia"),
   ARBITRUM_SEPOLIA_RPC_URL: z.string().min(1).default("https://sepolia-rollup.arbitrum.io/rpc"),
   ARBITRUM_ONE_RPC_URL: z.string().min(1).default("https://arb1.arbitrum.io/rpc"),
+  ETHEREUM_SEPOLIA_RPC_URL: z.string().min(1).default("https://ethereum-sepolia-rpc.publicnode.com"),
   PRIVATE_KEY: z
     .string()
-    .regex(/^0x[0-9a-fA-F]{64}$/, "PRIVATE_KEY must be 0x-prefixed 32-byte hex")
+    .regex(/^(0x)?[0-9a-fA-F]{64}$/, "PRIVATE_KEY must be 32-byte hex")
+    .transform((v) => (v.startsWith("0x") ? v : `0x${v}`))
     .optional(),
   FACE_MATCH_REGISTRY_ADDRESS: z
     .string()

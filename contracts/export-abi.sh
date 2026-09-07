@@ -12,6 +12,7 @@ OUT_FILE="$SCRIPT_DIR/../apps/web/lib/contract.ts"
 # Preserve existing address values, if any, before we overwrite the file.
 ADDR_421614="undefined"
 ADDR_42161="undefined"
+ADDR_11155111="undefined"
 if [ -f "$OUT_FILE" ]; then
   existing=$(grep -oE '421614: [^,]+,' "$OUT_FILE" || true)
   if [ -n "$existing" ]; then
@@ -20,6 +21,10 @@ if [ -f "$OUT_FILE" ]; then
   existing=$(grep -oE '42161: [^,]+,' "$OUT_FILE" || true)
   if [ -n "$existing" ]; then
     ADDR_42161=$(echo "$existing" | sed -E 's/42161: ([^,]+),/\1/')
+  fi
+  existing=$(grep -oE '11155111: [^,]+,' "$OUT_FILE" || true)
+  if [ -n "$existing" ]; then
+    ADDR_11155111=$(echo "$existing" | sed -E 's/11155111: ([^,]+),/\1/')
   fi
 fi
 
@@ -38,6 +43,7 @@ mkdir -p "$(dirname "$OUT_FILE")"
   echo "export const CONTRACT_ADDRESSES: Record<number, \`0x\${string}\` | undefined> = {"
   echo "  421614: $ADDR_421614, // Arbitrum Sepolia"
   echo "  42161: $ADDR_42161, // Arbitrum One"
+  echo "  11155111: $ADDR_11155111, // Ethereum Sepolia"
   echo "};"
 } > "$OUT_FILE"
 

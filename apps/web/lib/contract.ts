@@ -154,4 +154,5 @@ export const FACE_MATCH_REGISTRY_ABI = [
 export const CONTRACT_ADDRESSES: Record<number, `0x${string}` | undefined> = {
   421614: undefined, // Arbitrum Sepolia
   42161: undefined, // Arbitrum One
+  11155111: "0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87", // Ethereum Sepolia
 };
