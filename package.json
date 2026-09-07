@@ -1,0 +1,29 @@
+{
+  "name": "faceid-blockchain",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Face scan -> reverse-image search -> blockchain evidence pipeline",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "pipeline": "tsx src/cli.ts",
+    "face:smoke": "tsx src/lib/face.ts --smoke",
+    "chain:local": "anvil --host 127.0.0.1 --port 8545",
+    "chain:deploy": "tsx src/cli.ts --deploy"
+  },
+  "dependencies": {
+    "@canvas/image": "^2.0.0",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.14",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
