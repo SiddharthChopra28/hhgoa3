@@ -1,204 +1,201 @@
-# FaceID — Photo Provenance on-chain
+# Photo Provenance Registry
 
-A pipeline that takes a face photo, finds real social-media posts containing that
-photo via **live reverse-image search**, verifies the face in each candidate, and
-seals the best match on a blockchain as a tamper-evident record.
+A pipeline that takes an uploaded photo, encodes the face it contains, finds public social-media posts containing that photo through live reverse-image search, verifies that each candidate actually shows the same face, and seals the best match on Arbitrum One as a tamper-evident record.
 
-```
-face scan → reverse-image search → face verification → blockchain record → on-chain re-verification
-```
+Scope: this is image-level provenance ("where has this photo been posted?"), not identity search ("who is this person?"). The face embedding is used only to verify candidates returned by reverse-image search. It is never used to search by face, and it never leaves the server.
 
-> **Scope:** this is **image-level provenance** ("where has this photo been posted?").
-> It finds copies/near-copies of *the image* that contain the *same detected face*.
-> It does **not** identify an unknown person or search the web by biometric identity.
+## Blockchain
 
----
+| Item | Value |
+|---|---|
+| Network | Arbitrum One (chain id 42161) |
+| Contract | `FaceMatchRegistry` at `<ARBITRUM_ONE_CONTRACT_ADDRESS>` |
+| Arbiscan | `<ARBITRUM_ONE_ARBISCAN_CONTRACT_URL>` |
+| Example transaction | `<ARBITRUM_ONE_EXAMPLE_TX_URL>` |
+| Test deployment | Arbitrum Sepolia (chain id 421614) at `<ARBITRUM_SEPOLIA_CONTRACT_ADDRESS>` |
+
+The contract stores one record per image hash. Each record holds the keccak256 hash of the normalised image, the keccak256 hash of the face embedding, the URL of the matching post, the block timestamp and the submitting address, and emits a `MatchRecorded` event with the same data.
 
 ## Architecture
 
 ```
-┌─────────────┐   face detect + encode   ┌──────────────────┐
-│  input image │ ──────────────────────▶ │ face-api.js (WASM)│  tiny_face_detector
-└─────────────┘                           │  128-d descriptor │  + face_recognition
-       │                                  └──────────────────┘
-       ▼  keccak256 + dHash
-┌─────────────┐
-│   hashing   │
-└─────────────┘
-       │  upload public copy (catbox/tmpfiles)
-       ▼
-┌──────────────────────────────┐        ┌─────────────────────────────┐
-│ reverse image search (SerpApi)│ ─────▶ │ Google Lens  +  Yandex     │
-└──────────────────────────────┘        └─────────────────────────────┘
-       │  candidates {pageUrl, imageUrl}
-       ▼
-┌──────────────────────────────┐
-│ verify: fetch bytes, hash,   │   face cosine similarity ≥ threshold
-│ dHash distance, face compare │   (social domains ranked first)
-└──────────────────────────────┘
-       │  best verified candidate
-       ▼
-┌──────────────────────────────┐        ┌────────────────────────────┐
-│ evidence manifest (canonical │ ─────▶ │ FaceMatchRegistry contract  │
-│ JSON) → keccak256            │  record │ (Arbitrum Sepolia / anvil)  │
-└──────────────────────────────┘        └────────────────────────────┘
-       │  read back getRecord()          ▲
-       └─────────────────────────────────┘  (re-verify on-chain)
+                 +-------------------+
+   photo  -----> |  apps/web (Next)  |  route handlers + SSE stream + CLI
+                 +---------+---------+
+                           |
+        +------------------+------------------+---------------------+
+        v                  v                  v                     v
++---------------+  +---------------+  +----------------+  +--------------------+
+| services/face |  | Vercel Blob   |  | SerpApi Lens   |  | FaceMatchRegistry  |
+| FastAPI       |  | temp public   |  | (TinEye        |  | Solidity, Arbitrum |
+| InsightFace   |  | URL, deleted  |  |  fallback)     |  | One via viem       |
+| buffalo_l     |  | after run     |  |                |  |                    |
++---------------+  +---------------+  +----------------+  +--------------------+
 ```
 
-### Components
+Pipeline stages, in order:
 
-| Piece | Tech |
-|---|---|
-| Face detection + 128-d encoding | `@vladmandic/face-api` (`tiny_face_detector` + `face_recognition`), TF.js WASM backend — no GPU/native build needed |
-| Image hashing | keccak256 (viem) + 64-bit dHash perceptual hash |
-| Reverse image search | SerpApi `google_lens` and `yandex_images` (two independent indexes) |
-| Temporary public hosting | `catbox.moe` or `tmpfiles.org` (free, no auth; overridable) |
-| Smart contract | `FaceMatchRegistry` (Solidity, Foundry) |
-| Chain client | viem |
-| Orchestration | TypeScript pipeline shared by a CLI and a tiny web UI (SSE) |
+1. `upload`: validate (image, at most 5 MB), auto-rotate and resize to a 1024 px longest side, compute `imageHash = keccak256(resized bytes)`, upload to a temporary public URL.
+2. `detect`: send the resized image to the face service, take the largest face, keep its 512-d ArcFace embedding in server memory, compute `faceHash` from a deterministic serialisation of the rounded embedding.
+3. `search`: reverse-image search the temporary URL with Google Lens (SerpApi), filter results to social platforms, deduplicate, fall back to TinEye on zero results or quota errors.
+4. `verify`: for each candidate, the face service downloads the candidate thumbnail, detects faces and returns the maximum cosine similarity to the stored embedding. Candidates at or above the threshold (default 0.5) are kept and sorted.
+5. `record`: write `(imageHash, faceHash, bestPostUrl)` to the registry with a capped gas price, wait for the receipt and return the transaction and block.
 
-### Evidence manifest
-
-The on-chain key is the keccak256 hash of a canonical (sorted-key) JSON manifest:
-
-```json
-{
-  "version": "1",
-  "sourceImageHash": "0x…",
-  "candidateImageHash": "0x…",
-  "postUrl": "https://…",
-  "provider": "google_lens | yandex_reverse",
-  "faceModel": "face-api.js/tiny_face_detector+face_recognition",
-  "faceScoreBps": 8734,
-  "perceptualDistance": 4,
-  "createdAt": "…"
-}
-```
-
-The chain stores the source-image hash, candidate-image hash, post URL and face
-score, keyed immutably by that manifest hash. A key can never be overwritten.
-
----
-
-## Quick start
-
-### 1. Install
-
-```bash
-npm install
-curl -L https://foundry.paradigm.xyz | bash   # then: foundryup
-cd contracts && forge install foundry-rs/forge-std && forge build && cd ..
-```
-
-Face models are committed under `models/` (no download needed).
-
-### 2. Configure
-
-```bash
-cp .env.example .env
-```
-
-Minimal keys:
-
-```bash
-SERPAPI_API_KEY=...        # required for live search
-RPC_URL=http://127.0.0.1:8545
-CHAIN_ID=31337
-PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-```
-
-### 3. Start a local chain + deploy
-
-```bash
-npm run chain:local          # anvil on :8545 (keep running)
-npm run chain:deploy         # deploys FaceMatchRegistry, writes deployments/<chainId>.json
-```
-
-### 4. Run the pipeline
-
-```bash
-npm run pipeline -- ./path/to/photo.jpg
-```
-
-Or use the small web UI (open http://localhost:3000):
-
-```bash
-npm run dev
-```
-
-### 5. Smoke test (no search key needed)
-
-`MOCK_SEARCH_URL` swaps live search for one fixed URL, exercising the full
-face → verify → chain path:
-
-```bash
-MOCK_SEARCH_URL=https://files.catbox.moe/xs1tji.jpg \
-  npm run pipeline -- demo/sample1.jpg
-```
-
----
-
-## Blockchain
-
-Primary target: **Arbitrum Sepolia** (public testnet). Any EVM chain works — the
-same code deploys to local **anvil** (chain id 31337), Arbitrum Sepolia (421614),
-or Arbitrum One (42161).
-
-For a public testnet:
-
-```bash
-RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
-CHAIN_ID=421614
-PRIVATE_KEY=<funded sepolia key>
-npm run chain:deploy
-```
-
-Then run a scan normally — the record is written to that network and shown with an
-Arbiscan link. The `MatchRecorded` event and `getRecord` are viewable on the
-explorer, proving the data was committed and can be re-verified.
-
----
-
-## Verification flow
-
-The pipeline ends by reading the record back from the contract and confirming the
-stored `sourceImageHash` matches the input image. On-chain, the record is keyed by
-`evidenceHash` (the manifest hash), so re-running the manifest through the same
-canonical JSON → keccak256 produces the key to look up.
-
----
-
-## Known limitations
-
-- **Image-level, not identity-level.** It finds posts of *this photo*, not of a
-  person. A face crop is never sent to the search engine.
-- **Depends on third-party search availability and quotas.** SerpApi free tier is
-  250 searches/month; Google Lens/Yandex coverage of a given post is not guaranteed.
-  Post the photo publicly (and let it be indexed) before demoing.
-- **Social platforms may block image fetches**, so a candidate can be found but
-  not byte-verified; such candidates are reported but not sealed.
-- **Face similarity threshold is heuristic** (default cosine 0.5). Tune
-  `FACE_SIMILARITY_THRESHOLD` for your photos.
-- **No biometric data is persisted.** Embeddings live only in memory during a run;
-  only hashes are stored on-chain. The uploaded public copy is short-lived (the
-  free hosts expire files after a period), but deletion is not guaranteed.
-- **One record per evidence manifest.** Re-running the same image produces a new
-  `createdAt`, hence a new manifest hash and a new record (by design).
-- **Temporary upload goes to a third-party host** (catbox/tmpfiles by default);
-  the search engine also receives the image.
-
----
+The temporary upload is deleted in a `finally` block on every path. The embedding is dropped from memory when the run ends or after ten minutes.
 
 ## Repository layout
 
 ```
-contracts/        Foundry project: FaceMatchRegistry.sol + tests
-src/lib/          face, search, host, hash, manifest, chain, config
-src/pipeline.ts   orchestration (shared by CLI + server)
-src/cli.ts        command-line entry
-src/server.ts     minimal web UI + SSE
-models/           face-api model weights
-demo/             bundled test fixtures (from the face-api project)
-deployments/      deployed contract addresses + ABIs (gitignored)
+apps/web         Next.js App Router app: UI, API route handlers, CLI script
+services/face    FastAPI service wrapping InsightFace buffalo_l
+contracts        Foundry project: FaceMatchRegistry.sol, tests, deploy script
+docker-compose.yml
+.env.example
 ```
+
+## Stack
+
+| Stage | Choice |
+|---|---|
+| Face detection and encoding | InsightFace `buffalo_l` (SCRFD + ArcFace, 512-d) on onnxruntime, FastAPI |
+| Reverse image search | SerpApi `google_lens`, TinEye REST API as fallback |
+| Temporary public link | Vercel Blob, deleted after each run |
+| Chain | Solidity `FaceMatchRegistry`, Foundry, Arbitrum One (Arbitrum Sepolia for development) |
+| Chain client | viem, server side only |
+| Web app | Next.js App Router, TypeScript, Tailwind, Framer Motion, shadcn-style primitives |
+| Image processing | sharp |
+
+## Prerequisites
+
+- Node 22 and pnpm 10
+- Python 3.12 and `uv` (or Docker for the face service)
+- Foundry (`forge`, `cast`, `anvil`)
+- Accounts: SerpApi, TinEye (optional), Vercel Blob, an Arbitrum RPC endpoint, a funded server wallet
+
+## Configuration
+
+Copy `.env.example` to `.env` at the repository root and fill in the values. Both the web app and the face service read this file.
+
+| Variable | Purpose |
+|---|---|
+| `FACE_SERVICE_URL` | Base URL of the face service, default `http://localhost:8000` |
+| `FACE_SIMILARITY_THRESHOLD` | Cosine similarity required to accept a candidate, default `0.5` |
+| `SERPAPI_API_KEY` | SerpApi key for Google Lens |
+| `TINEYE_API_KEY` | Optional TinEye key used as fallback |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token for the temporary upload |
+| `CHAIN` | `arbitrum-one` or `arbitrum-sepolia` |
+| `ARBITRUM_ONE_RPC_URL`, `ARBITRUM_SEPOLIA_RPC_URL` | RPC endpoints |
+| `PRIVATE_KEY` | Server wallet used to submit records |
+| `FACE_MATCH_REGISTRY_ADDRESS` | Optional override of the address in `apps/web/lib/contract.ts` |
+| `MAX_FEE_PER_GAS_GWEI` | Gas price cap for the write, default `1` |
+| `MAX_UPLOAD_BYTES` | Upload limit, default 5 MB |
+| `ARBISCAN_API_KEY` | Used by Foundry to verify the contract source on Arbiscan |
+
+Timeouts: face service 20 s, search 30 s, transaction receipt 90 s.
+
+## Running
+
+### 1. Face service
+
+With Docker (models are downloaded at build time):
+
+```
+docker compose up --build face
+```
+
+Or locally:
+
+```
+cd services/face
+uv venv .venv --python 3.12
+uv pip install --python .venv/bin/python -r requirements.txt
+.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Check with `curl localhost:8000/health`.
+
+### 2. Web app
+
+```
+pnpm install
+pnpm dev
+```
+
+Open `http://localhost:3000`.
+
+### 3. Command line
+
+The CLI runs the same pipeline functions as the web app and prints the result as JSON:
+
+```
+pnpm run:cli ./photo.jpg
+pnpm run:cli --check ./photo.jpg     # look up an existing record for this image
+pnpm run:cli --no-chain ./photo.jpg  # run everything except the on-chain write
+```
+
+Exit codes: 0 sealed or dry run, 2 no face or no matches, 1 error.
+
+### 4. Tests
+
+```
+pnpm --filter web selftest          # hashing, URL normalisation, image normalisation, rate limiter
+cd services/face && .venv/bin/pytest tests/   # keccak and face-hash vectors shared with the Node side
+cd contracts && forge test
+```
+
+## Contract
+
+```
+cd contracts
+forge install foundry-rs/forge-std
+forge build
+forge test
+```
+
+Deploy and verify (Arbitrum Sepolia shown; use `arbitrum_one` for mainnet):
+
+```
+export PRIVATE_KEY=0x...
+export ARBITRUM_SEPOLIA_RPC_URL=...
+export ARBISCAN_API_KEY=...
+forge script script/Deploy.s.sol --rpc-url arbitrum_sepolia --broadcast --verify
+./export-abi.sh
+```
+
+Then put the deployed address into `apps/web/lib/contract.ts` (or set `FACE_MATCH_REGISTRY_ADDRESS`).
+
+## API
+
+All routes live under `apps/web/app/api` and run on the Node runtime.
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/run` | POST multipart `file` | Full pipeline as a Server-Sent Events stream |
+| `/api/upload` | POST multipart `file` | Normalise, hash and host the image |
+| `/api/detect` | POST | Detect the face and store the embedding under a job id |
+| `/api/search` | POST `{url}` | Reverse-image search |
+| `/api/verify` | POST `{jobId, candidates}` | Face-verify candidates |
+| `/api/record` | POST `{imageHash, faceHash, postUrl}` | Write a record (also used to retry a failed seal) |
+| `/api/verify-existing` | POST multipart `file` | Hash an image and read its record from the chain |
+| `/api/health` | GET | Service status |
+
+`/api/run` accepts one active job per client IP.
+
+## Hashes
+
+- `imageHash`: keccak256 of the resized JPEG bytes. The same normalisation runs on "Check a record", so a re-uploaded original yields the same hash.
+- `faceHash`: keccak256 of the UTF-8 string `[v1,v2,...,v512]` where each `vi = floor(embedding[i] * 10000 + 0.5)`. The Node and Python implementations are tested against the same vectors.
+
+## Limitations
+
+- Image-level, not identity-level. The system finds posts of this photo (or close variants that still contain the same face). It does not find other photos of the same person.
+- Depends on third-party search availability and quotas. SerpApi and TinEye coverage of a given post is not guaranteed; a post must be indexed before it can be found.
+- Social platforms may block thumbnail fetches, in which case a candidate is found but cannot be verified and is not sealed.
+- The similarity threshold is a heuristic tuned on a handful of photos.
+- No biometric data is persisted. Embeddings live only in server memory during a run. Only hashes are written on-chain.
+- One record per image hash. Re-running the same image overwrites the previous record.
+- The temporary public upload exists for the duration of one run and is deleted afterwards, but the search providers receive the image.
+
+## License
+
+MIT
