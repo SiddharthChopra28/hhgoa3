@@ -1,6 +1,6 @@
 # Photo Provenance Registry
 
-A pipeline that takes an uploaded photo, encodes the face it contains, finds public social-media posts containing that photo through live reverse-image search, verifies that each candidate actually shows the same face, and seals the best match on Arbitrum One as a tamper-evident record.
+A pipeline that takes an uploaded photo, encodes the face it contains, finds public social-media posts containing that photo through live reverse-image search, verifies that each candidate actually shows the same face, and seals the best match on an EVM chain (Ethereum Sepolia for this submission) as a tamper-evident record.
 
 Scope: this is image-level provenance ("where has this photo been posted?"), not identity search ("who is this person?"). The face embedding is used only to verify candidates returned by reverse-image search. It is never used to search by face, and it never leaves the server.
 
@@ -8,15 +8,16 @@ Scope: this is image-level provenance ("where has this photo been posted?"), not
 
 | Item | Value |
 |---|---|
-| Network | Arbitrum One (chain id 42161) |
-| Contract | `FaceMatchRegistry` at `<ARBITRUM_ONE_CONTRACT_ADDRESS>` |
-| Arbiscan | `<ARBITRUM_ONE_ARBISCAN_CONTRACT_URL>` |
-| Example transaction | `<ARBITRUM_ONE_EXAMPLE_TX_URL>` |
-| Test deployment | Ethereum Sepolia (chain id 11155111) at [`0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87`](https://sepolia.etherscan.io/address/0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87), source [verified on Etherscan](https://sepolia.etherscan.io/address/0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87#code) |
-| Test deployment tx | [`0x238aff84…727d04`](https://sepolia.etherscan.io/tx/0x238aff84e54344432a4ff34c9dc7fd0bd9cd78f33fad97f65a5ca53e2c727d04) |
-| Test sealed record | [`0x27a6113d…bae48a`](https://sepolia.etherscan.io/tx/0x27a6113d90c864b48760718a1d753a555bab53f1976113b45c35ff8e68bae48a) (`MatchRecorded` for `demo/virat.jpg`) |
+| Network | Ethereum Sepolia (chain id 11155111) |
+| Contract | [`0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87`](https://sepolia.etherscan.io/address/0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87) |
+| Source | [Verified on Etherscan](https://sepolia.etherscan.io/address/0x5A1cf0835F8CF7cfCFc0b2d59B3fb8865EE65e87#code) |
+| Deployment tx | [`0x238aff84…727d04`](https://sepolia.etherscan.io/tx/0x238aff84e54344432a4ff34c9dc7fd0bd9cd78f33fad97f65a5ca53e2c727d04) |
+| Example sealed record | [`0x27a6113d…bae48a`](https://sepolia.etherscan.io/tx/0x27a6113d90c864b48760718a1d753a555bab53f1976113b45c35ff8e68bae48a), `MatchRecorded` for `demo/virat.jpg` |
+| Submitter wallet | `0x4f38D2E6d070bD2E573bcA2D27F001258Da1D72E` |
 
-The contract stores one record per image hash. Each record holds the keccak256 hash of the normalised image, the keccak256 hash of the face embedding, the URL of the matching post, the block timestamp and the submitting address, and emits a `MatchRecorded` event with the same data.
+The same contract and client also support Arbitrum One and Arbitrum Sepolia; switch with `CHAIN` and deploy with the Foundry script below. Only the Ethereum Sepolia deployment is live at the time of writing.
+
+The contract stores one record per image hash. Each record holds the keccak256 hash of the normalised image, the keccak256 hash of the face embedding, the URL of the matching post, the block timestamp and the submitting address, and emits a `MatchRecorded` event with the same data. Records are written by a server-side wallet; end users do not connect a wallet.
 
 ## Architecture
 
@@ -62,7 +63,7 @@ docker-compose.yml
 | Face detection and encoding | InsightFace `buffalo_l` (SCRFD + ArcFace, 512-d) on onnxruntime, FastAPI |
 | Reverse image search | SerpApi `google_lens`, TinEye REST API as fallback |
 | Temporary public link | Vercel Blob, deleted after each run |
-| Chain | Solidity `FaceMatchRegistry`, Foundry, Arbitrum One (Arbitrum Sepolia for development) |
+| Chain | Solidity `FaceMatchRegistry`, Foundry, deployed on Ethereum Sepolia (Arbitrum One and Arbitrum Sepolia supported) |
 | Chain client | viem, server side only |
 | Web app | Next.js App Router, TypeScript, Tailwind, Framer Motion, shadcn-style primitives |
 | Image processing | sharp |
