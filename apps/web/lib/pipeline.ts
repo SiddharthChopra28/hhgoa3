@@ -48,7 +48,6 @@ async function pool<T, R>(items: T[], limit: number, worker: (item: T) => Promis
 async function verifyCandidates(
   embedding: number[],
   candidates: Candidate[],
-  threshold: number,
 ): Promise<VerifiedCandidate[]> {
   const scored = await pool(candidates, VERIFY_CONCURRENCY, async (candidate) => {
     // The thumbnail is the image; the post URL is an HTML page the face service cannot read.
@@ -62,7 +61,7 @@ async function verifyCandidates(
     }
   });
   return scored
-    .filter((c): c is VerifiedCandidate => c !== null && c.similarity >= threshold)
+    .filter((c): c is VerifiedCandidate => c !== null)
     .sort((a, b) => b.similarity - a.similarity);
 }
 
@@ -130,13 +129,14 @@ export async function runPipeline(
     stage = "verify";
     emit({ stage: "verify", status: "start" });
     const threshold = env.FACE_SIMILARITY_THRESHOLD;
-    const matches = await verifyCandidates(embedding, candidates, threshold);
+    const scored = await verifyCandidates(embedding, candidates);
+    const matches = scored.filter((c) => c.similarity >= threshold);
     result.matches = matches;
     result.best = matches[0];
     emit({
       stage: "verify",
       status: "ok",
-      payload: { matches, rejected: candidates.length - matches.length, threshold },
+      payload: { matches, rejected: candidates.length - matches.length, threshold, scored },
     });
     if (matches.length === 0) {
       emit({ stage: "record", status: "skipped", message: "Nothing to seal" });

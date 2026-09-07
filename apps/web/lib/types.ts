@@ -78,6 +78,7 @@ export interface VerifyPayload {
   matches: VerifiedCandidate[]; // similarity >= threshold, sorted desc
   rejected: number;
   threshold: number;
+  scored?: VerifiedCandidate[]; // every candidate that could be compared, sorted desc
 }
 
 export type RecordPayload = ChainReceipt;

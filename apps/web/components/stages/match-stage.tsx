@@ -131,6 +131,7 @@ export function MatchStage({
   const candidates = search?.candidates ?? [];
   const matches: VerifiedCandidate[] = verify?.matches ?? [];
   const matchedUrls = new Set(matches.map((m) => m.url));
+  const scoreOf = new Map((verify?.scored ?? []).map((c) => [c.url, c.similarity]));
   const others = candidates.filter((c) => !matchedUrls.has(c.url));
 
   if (candidates.length === 0 && verify) {
@@ -153,6 +154,7 @@ export function MatchStage({
             open={open}
             setOpen={setOpen}
             reduced={!!reduced}
+            scoreOf={scoreOf}
           />
         ) : null}
       </div>
@@ -192,6 +194,7 @@ export function MatchStage({
           open={open}
           setOpen={setOpen}
           reduced={!!reduced}
+          scoreOf={scoreOf}
         />
       ) : null}
     </div>
@@ -203,11 +206,13 @@ function OtherCandidates({
   open,
   setOpen,
   reduced,
+  scoreOf,
 }: {
   others: Candidate[];
   open: boolean;
   setOpen: (v: boolean) => void;
   reduced: boolean;
+  scoreOf: Map<string, number>;
 }) {
   return (
     <div className="rounded-lg border border-hairline">
@@ -240,7 +245,12 @@ function OtherCandidates({
           >
             <div className="grid grid-cols-1 gap-3 border-t border-hairline p-4 sm:grid-cols-2">
               {others.map((candidate) => (
-                <CandidateCard key={candidate.url} candidate={candidate} dimmed />
+                <CandidateCard
+                  key={candidate.url}
+                  candidate={candidate}
+                  similarity={scoreOf.get(candidate.url)}
+                  dimmed
+                />
               ))}
             </div>
           </motion.div>

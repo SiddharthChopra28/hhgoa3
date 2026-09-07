@@ -45,21 +45,23 @@ export async function POST(req: Request) {
     if (!job) throw new AppError("job_not_found", "Job not found or expired", 404);
 
     const threshold = env.FACE_SIMILARITY_THRESHOLD;
-    const matches: VerifiedCandidate[] = [];
+    const scored: VerifiedCandidate[] = [];
     for (const candidate of parsed.data.candidates) {
       if (!candidate.thumbnail) continue;
       try {
         const { similarity } = await compare(job.embedding, candidate.thumbnail);
-        if (similarity >= threshold) matches.push({ ...candidate, similarity });
+        scored.push({ ...candidate, similarity });
       } catch (e) {
         console.warn(`[verify] ${candidate.url}: ${errorMessage(e)}`);
       }
     }
-    matches.sort((a, b) => b.similarity - a.similarity);
+    scored.sort((a, b) => b.similarity - a.similarity);
+    const matches = scored.filter((c) => c.similarity >= threshold);
     return NextResponse.json({
       matches,
       rejected: parsed.data.candidates.length - matches.length,
       threshold,
+      scored,
     });
   } catch (e) {
     return jsonError(e);
